@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{query}} - Ymal Search</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="assets/favicon.ico">
+</head>
+<body>
+    <!-- Results Header -->
+    <header class="results-header">
+        <div class="container">
+            <a href="index.html" class="results-logo">🔍 Ymal Search</a>
+            
+            <form action="search.html" method="GET" class="results-search-form">
+                <div class="results-input-wrapper">
+                    <div class="search-icon">🔍</div>
+                    <input 
+                        type="text" 
+                        name="q" 
+                        id="searchInput" 
+                        value=""
+                        placeholder="Search..."
+                        autocomplete="off"
+                        required
+                    >
+                    <button type="submit" class="search-button">Search</button>
+                </div>
+            </form>
+            
+            <a href="https://ymal.space" class="back-link">Main Site</a>
+        </div>
+    </header>
+
+    <!-- Search Results -->
+    <main class="results-main">
+        <div class="container">
+            <!-- Results Info -->
+            <div class="results-info">
+                <span id="resultsCount">0</span> results • Search took <span id="searchTime">0</span> seconds
+            </div>
+            
+            <!-- Results Container -->
+            <div id="resultsContainer">
+                <!-- Results will be loaded here by JavaScript -->
+                <div class="loading">Loading search results...</div>
+            </div>
+            
+            <!-- Pagination -->
+            <div class="pagination" id="pagination">
+                <!-- Pagination will be loaded here -->
+            </div>
+            
+            <!-- Privacy Note -->
+            <div style="margin-top: 50px; padding: 20px; background: var(--light-blue); border-radius: 10px; text-align: center;">
+                <p style="color: var(--text-light); font-size: 0.9rem;">
+                    🔒 <strong>Private Search:</strong> Your query was not logged or tracked. 
+                    <a href="about-search.html" style="color: var(--primary-blue);">Learn more</a>
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="search-footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="about-search.html">About This Search</a>
+                <a href="https://ymal.space/privacy-policy.html">Privacy Policy</a>
+                <a href="https://ymal.space">Main Website</a>
+                <a href="#" id="darkModeToggle">Dark Mode</a>
+            </div>
+            <p class="footer-note">
+                Ymal Search • No tracking, no cookies, just search.
+            </p>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="script.js"></script>
+    <script>
+        // Get query from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const query = urlParams.get('q') || '';
+        
+        // Set search input value
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput && query) {
+            searchInput.value = query;
+            document.title = `${query} - Ymal Search`;
+        }
+        
+        // Perform search when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            if (query.trim()) {
+                performSearch(query);
+            } else {
+                // No query, show homepage
+                window.location.href = 'index.html';
+            }
+        });
+        
+        // Dark mode toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        if (darkModeToggle) {
+            darkModeToggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.body.classList.toggle('dark-mode');
+                localStorage.setItem('ymalDarkMode', document.body.classList.contains('dark-mode'));
+            });
+            
+            // Load dark mode preference
+            if (localStorage.getItem('ymalDarkMode') === 'true') {
+                document.body.classList.add('dark-mode');
+            }
+        }
+    </script>
+</body>
+</html>
