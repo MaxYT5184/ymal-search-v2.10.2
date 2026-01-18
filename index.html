@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ymal Search - Private Search Engine</title>
+    <meta name="description" content="Search privately with Ymal. No tracking, no cookies, just results.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="assets/favicon.ico">
+    <style>
+        /* Quick inline styles for immediate functionality */
+        :root {
+            --search-blue: #2563eb;
+            --search-red: #dc2626;
+            --search-bg: #ffffff;
+            --search-text: #1f2937;
+            --search-border: #e5e7eb;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <!-- Simple Header -->
+    <header class="search-header">
+        <div class="container">
+            <a href="https://ymal.space" class="back-link" title="Go to main website">← ymal.space</a>
+            <div class="logo">
+                🔍 <strong>Ymal</strong><span class="domain">.search</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Search Area -->
+    <main class="search-main">
+        <div class="container">
+            <!-- Logo/Title -->
+            <div class="search-title">
+                <h1>Ymal Search</h1>
+                <p class="tagline">Private • Fast • No Tracking</p>
+            </div>
+
+            <!-- Search Box -->
+            <div class="search-container">
+                <form action="search.html" method="GET" id="searchForm" class="search-form">
+                    <div class="search-input-wrapper">
+                        <div class="search-icon">🔍</div>
+                        <input 
+                            type="text" 
+                            name="q" 
+                            id="searchInput" 
+                            placeholder="Search the web privately..."
+                            autocomplete="off"
+                            autofocus
+                            required
+                        >
+                        <button type="submit" class="search-button">Search</button>
+                    </div>
+                    
+                    <!-- Search Tips -->
+                    <div class="search-tips">
+                        <span class="tip-title">Try:</span>
+                        <span class="tip">!yt for YouTube</span>
+                        <span class="tip">!w for Wikipedia</span>
+                        <span class="tip">!r for Reddit</span>
+                        <span class="tip">!img for Images</span>
+                    </div>
+                </form>
+                
+                <!-- Quick Stats -->
+                <div class="search-stats">
+                    <div class="stat">
+                        <span class="stat-number">0</span>
+                        <span class="stat-label">queries tracked</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">∞</span>
+                        <span class="stat-label">free searches</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">100%</span>
+                        <span class="stat-label">private</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Features -->
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon">🔒</div>
+                    <h3>No Tracking</h3>
+                    <p>We don't track your searches or store personal data.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Fast Results</h3>
+                    <p>Instant search results from multiple sources.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🌍</div>
+                    <h3>Global</h3>
+                    <p>Available worldwide with clean results.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="search-footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="about-search.html">About This Search</a>
+                <a href="https://ymal.space/privacy-policy.html">Privacy</a>
+                <a href="https://ymal.space">Main Website</a>
+            </div>
+            <p class="footer-note">
+                Ymal Search • No tracking, no cookies, just search.
+            </p>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Simple search suggestions
+        const searchInput = document.getElementById('searchInput');
+        const searchForm = document.getElementById('searchForm');
+        
+        // Focus on search input
+        if (searchInput) {
+            searchInput.focus();
+            
+            // Add instant search if typing without submitting
+            searchInput.addEventListener('keyup', function(e) {
+                if (e.key === 'Enter' && this.value.trim()) {
+                    // Redirect to search results
+                    window.location.href = `search.html?q=${encodeURIComponent(this.value)}`;
+                }
+            });
+        }
+        
+        // Form submission
+        if (searchForm) {
+            searchForm.addEventListener('submit', function(e) {
+                const query = searchInput.value.trim();
+                if (!query) {
+                    e.preventDefault();
+                    searchInput.focus();
+                }
+            });
+        }
+        
+        // Update stats (fake for now)
+        function updateStats() {
+            const statNumber = document.querySelector('.stat-number');
+            if (statNumber) {
+                // This would be replaced with real stats later
+                statNumber.textContent = '0';
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', updateStats);
+    </script>
+</body>
+</html>
