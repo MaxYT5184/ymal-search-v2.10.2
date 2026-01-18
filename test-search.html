@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Search</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .result { border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Ymal Search Test</h1>
+    
+    <button onclick="testSearch('catfish')">Test: catfish</button>
+    <button onclick="testSearch('technology')">Test: technology</button>
+    <button onclick="testSearch('news')">Test: news</button>
+    
+    <div id="results"></div>
+    
+    <script>
+        async function testSearch(query) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `<p>Searching for "${query}"...</p>`;
+            
+            try {
+                // Test direct API call
+                const response = await fetch(`https://searx.be/search?q=${encodeURIComponent(query)}&format=json`);
+                const data = await response.json();
+                
+                resultsDiv.innerHTML = `
+                    <h3 class="success">✓ Search Successful!</h3>
+                    <p>Found ${data.results?.length || 0} results</p>
+                    <div>
+                        ${data.results ? data.results.slice(0, 3).map(r => `
+                            <div class="result">
+                                <strong>${r.title}</strong><br>
+                                <small>${r.url}</small><br>
+                                ${r.content?.substring(0, 100)}...
+                            </div>
+                        `).join('') : 'No results'}
+                    </div>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <h3 class="error">✗ Search Failed</h3>
+                    <p>Error: ${error.message}</p>
+                    <p>Check browser console for details.</p>
+                `;
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
