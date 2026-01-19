@@ -53,10 +53,10 @@
             </div>
             
             <!-- Privacy Note -->
-            <div style="margin-top: 50px; padding: 20px; background: var(--light-blue); border-radius: 10px; text-align: center;">
-                <p style="color: var(--text-light); font-size: 0.9rem;">
+            <div class="privacy-note">
+                <p>
                     🔒 <strong>Private Search:</strong> Your query was not logged or tracked. 
-                    <a href="about-search.html" style="color: var(--primary-blue);">Learn more</a>
+                    <a href="about-search.html">Learn more</a>
                 </p>
             </div>
         </div>
@@ -79,42 +79,5 @@
 
     <!-- JavaScript -->
     <script src="script.js"></script>
-    <script>
-        // Get query from URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const query = urlParams.get('q') || '';
-        
-        // Set search input value
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput && query) {
-            searchInput.value = query;
-            document.title = `${query} - Ymal Search`;
-        }
-        
-        // Perform search when page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            if (query.trim()) {
-                performSearch(query);
-            } else {
-                // No query, show homepage
-                window.location.href = 'index.html';
-            }
-        });
-        
-        // Dark mode toggle
-        const darkModeToggle = document.getElementById('darkModeToggle');
-        if (darkModeToggle) {
-            darkModeToggle.addEventListener('click', (e) => {
-                e.preventDefault();
-                document.body.classList.toggle('dark-mode');
-                localStorage.setItem('ymalDarkMode', document.body.classList.contains('dark-mode'));
-            });
-            
-            // Load dark mode preference
-            if (localStorage.getItem('ymalDarkMode') === 'true') {
-                document.body.classList.add('dark-mode');
-            }
-        }
-    </script>
 </body>
 </html>
