@@ -1,574 +1,514 @@
-// YMAL SEARCH ENGINE - SIMPLIFIED WORKING VERSION
-// Using a free search API as fallback
+// ========================
+// YMAL SEARCH ENGINE v2.0
+// Professional Edition
+// ========================
 
-// Free search API endpoint (SearxNG instance)
+// Configuration
 const SEARCH_API_URL = 'https://search.unlocked.link/search';
+const PROMOTED_DATA_URL = 'promoted.json'; // You need to create this file
+const RESULTS_PER_PAGE = 10;
+let currentQuery = '';
+let currentPage = 1;
+let totalResults = 0;
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Ymal Search initialized');
+    console.log('🔍 Ymal Search v2.0 initialized');
+    initializeSearch();
     setupDarkMode();
-    
-    // Get query from URL
+    setupSearchSuggestions();
+    setupQuickSearch();
+});
+
+// Initialize search from URL
+function initializeSearch() {
     const urlParams = new URLSearchParams(window.location.search);
     const query = urlParams.get('q');
+    const page = parseInt(urlParams.get('page')) || 1;
     
-    // Set search input value
+    currentQuery = query || '';
+    currentPage = page;
+    
+    // Update search input
     const searchInput = document.getElementById('searchInput');
-    if (searchInput && query) {
-        searchInput.value = query;
-        document.title = `${query} - Ymal Search`;
+    if (searchInput && currentQuery) {
+        searchInput.value = currentQuery;
+        document.title = `${currentQuery} - Ymal Search`;
     }
     
     // Perform search if query exists
-    if (query && query.trim()) {
-        performSearch(query);
+    if (currentQuery.trim()) {
+        performSearch(currentQuery, currentPage);
+    } else if (window.location.pathname.includes('search.html')) {
+        // No query on search page, redirect home
+        window.location.href = 'index.html';
     }
-});
+}
 
-// Main search function
-async function performSearch(query) {
+// Main search function with pagination
+async function performSearch(query, page = 1) {
     const startTime = Date.now();
     const resultsContainer = document.getElementById('resultsContainer');
     
-    // Show loading
-    showLoading(query, resultsContainer);
+    currentQuery = query;
+    currentPage = page;
+    
+    // Update URL without reloading for pagination
+    updateURL(query, page);
+    
+    // Show loading animation
+    showLoadingAnimation(query, page, resultsContainer);
     
     try {
-        // Try SearxNG API first
-        const response = await fetch(`${SEARCH_API_URL}?q=${encodeURIComponent(query)}&format=json&language=en`, {
-            headers: {
-                'Accept': 'application/json',
-                'User-Agent': 'Ymal-Search/1.0'
-            },
-            signal: AbortSignal.timeout(10000) // 10 second timeout
-        });
+        // Get promoted results (from your JSON file)
+        const promotedResults = await fetchPromotedResults(query);
         
-        if (!response.ok) {
-            throw new Error(`Search API failed with status ${response.status}`);
-        }
+        // Get organic results from SearxNG
+        const response = await fetch(
+            `${SEARCH_API_URL}?q=${encodeURIComponent(query)}&format=json&language=en&pageno=${page}`,
+            {
+                headers: { 'Accept': 'application/json' },
+                signal: AbortSignal.timeout(8000)
+            }
+        );
+        
+        if (!response.ok) throw new Error(`API error: ${response.status}`);
         
         const data = await response.json();
+        totalResults = data.number_of_results || 0;
         
-        // Format results
-        const formattedResults = formatSearxResults(data);
-        
-        // Display results
-        displaySearchResults(formattedResults, query, startTime);
+        // Display all results
+        displaySearchResults(data, promotedResults, query, startTime, page);
         
     } catch (error) {
-        console.log('Falling back to mock results:', error.message);
-        
+        console.error('Search error:', error);
         // Fallback to mock results
-        const mockResults = generateMockResults(query);
-        displaySearchResults(mockResults, query, startTime);
+        const mockResults = generateMockResults(query, page);
+        const promotedResults = await fetchPromotedResults(query);
+        displaySearchResults(mockResults, promotedResults, query, startTime, page);
+    }
+}
+
+// Fetch promoted results from your JSON file
+async function fetchPromotedResults(query) {
+    try {
+        const response = await fetch(PROMOTED_DATA_URL);
+        const data = await response.json();
         
-        // Show fallback notice
-        showFallbackNotice();
-    }
-}
-
-// Format SearxNG results
-function formatSearxResults(data) {
-    const results = [];
-    
-    if (data.results && Array.isArray(data.results)) {
-        data.results.forEach((result, index) => {
-            results.push({
-                title: result.title || 'No title',
-                content: result.content || result.snippet || 'No description available',
-                url: result.url || '#',
-                engine: result.engine || 'Web',
-                score: 0.9 - (index * 0.05) // Simple relevance scoring
-            });
+        if (!data.promoted_results) return [];
+        
+        const queryLower = query.toLowerCase();
+        return data.promoted_results.filter(promo => {
+            // Check if query matches any trigger keywords
+            return promo.trigger_keywords?.some(keyword => 
+                queryLower.includes(keyword.toLowerCase())
+            );
         });
+    } catch (error) {
+        console.log('No promoted results loaded:', error);
+        return [];
     }
-    
-    return {
-        results: results.slice(0, 10), // Limit to 10 results
-        number_of_results: results.length,
-        query_time: 0.5
-    };
 }
 
-// Generate mock results for fallback
-function generateMockResults(query) {
-    const mockResults = [
-        {
-            title: `Learn about ${query}`,
-            content: `Discover comprehensive information about ${query}. Find tutorials, guides, and resources to help you understand ${query} better.`,
-            url: `https://wikipedia.org/wiki/${encodeURIComponent(query)}`,
-            engine: 'Wikipedia',
-            score: 0.95
-        },
-        {
-            title: `${query} Tutorial - Getting Started`,
-            content: `Beginner-friendly tutorial on ${query}. Learn step-by-step with practical examples and code snippets.`,
-            url: `https://youtube.com/results?search_query=${encodeURIComponent(query)}+tutorial`,
-            engine: 'YouTube',
-            score: 0.85
-        },
-        {
-            title: `${query} Documentation`,
-            content: `Official documentation and API reference for ${query}. Find detailed specifications and usage examples.`,
-            url: `https://dev.to/search?q=${encodeURIComponent(query)}`,
-            engine: 'Dev.to',
-            score: 0.80
-        },
-        {
-            title: `Reddit: ${query} Discussion`,
-            content: `Community discussions and insights about ${query}. Read experiences and opinions from real users.`,
-            url: `https://reddit.com/search?q=${encodeURIComponent(query)}`,
-            engine: 'Reddit',
-            score: 0.75
-        },
-        {
-            title: `${query} News and Updates`,
-            content: `Latest news, updates, and trends related to ${query}. Stay informed about recent developments.`,
-            url: `https://news.google.com/search?q=${encodeURIComponent(query)}`,
-            engine: 'Google News',
-            score: 0.70
-        }
-    ];
-    
-    return {
-        results: mockResults,
-        number_of_results: mockResults.length,
-        query_time: 0.3,
-        fallback: true
-    };
-}
-
-// Show loading
-function showLoading(query, container) {
-    container.innerHTML = `
-        <div class="loading-state">
-            <div class="spinner">🔍</div>
-            <h3>Searching for "${query}"</h3>
-            <p>Finding private, non-tracked results...</p>
-            <div class="privacy-note">
-                <small>🔒 Your search is not being tracked or logged</small>
-            </div>
-        </div>
-        <style>
-            .loading-state {
-                text-align: center;
-                padding: 40px;
-            }
-            .spinner {
-                font-size: 48px;
-                animation: spin 2s linear infinite;
-                margin-bottom: 20px;
-            }
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-        </style>
-    `;
-}
-
-// Display search results
-function displaySearchResults(data, query, startTime) {
+// Display all search results
+function displaySearchResults(data, promotedResults, query, startTime, page) {
     const resultsContainer = document.getElementById('resultsContainer');
     const resultsCount = document.getElementById('resultsCount');
     const searchTime = document.getElementById('searchTime');
     
-    // Calculate search time
+    // Calculate and display search time
     const elapsedTime = (Date.now() - startTime) / 1000;
-    
-    // Update stats
     if (searchTime) searchTime.textContent = elapsedTime.toFixed(2);
-    if (resultsCount) {
-        resultsCount.textContent = data.number_of_results.toLocaleString();
-    }
     
     // Clear container
     resultsContainer.innerHTML = '';
     
-    // Check if no results
-    if (!data.results || data.results.length === 0) {
-        showNoResults(query);
-        return;
+    // Display promoted results (ads)
+    if (promotedResults.length > 0) {
+        displayPromotedResults(promotedResults, resultsContainer);
     }
     
-    // Display each result
-    data.results.forEach((result, index) => {
-        const resultElement = createResultElement(result, index + 1);
-        resultsContainer.appendChild(resultElement);
+    // Calculate total results count
+    const organicResults = data.results || [];
+    const totalDisplayedResults = organicResults.length + promotedResults.length;
+    totalResults = data.number_of_results || totalDisplayedResults;
+    
+    if (resultsCount) {
+        resultsCount.textContent = totalResults.toLocaleString();
+    }
+    
+    // Display organic results with logos
+    if (organicResults.length > 0) {
+        displayOrganicResults(organicResults, resultsContainer, page);
+    } else {
+        showNoResultsMessage(query);
+    }
+    
+    // Show pagination if there are multiple pages
+    const totalPages = Math.ceil(totalResults / RESULTS_PER_PAGE);
+    if (totalPages > 1) {
+        showProfessionalPagination(page, totalPages, query);
+    }
+    
+    // Add privacy footer
+    addPrivacyFooter(query);
+}
+
+// Display promoted results with "Ad" badge
+function displayPromotedResults(promotedResults, container) {
+    const promotedSection = document.createElement('div');
+    promotedSection.className = 'promoted-section';
+    
+    let promotedHTML = `
+        <div class="promoted-header">
+            <span class="promoted-label">Sponsored Results</span>
+            <span class="promoted-info" title="These are paid promotions">ℹ️</span>
+        </div>
+    `;
+    
+    promotedResults.forEach((promo, index) => {
+        const domain = extractDomain(promo.url);
+        promotedHTML += `
+            <div class="result-item promoted-item">
+                <div class="result-badge">Ad</div>
+                <div class="result-header">
+                    <img src="https://www.google.com/s2/favicons?domain=${domain}&sz=16" 
+                         alt="${domain} icon" class="result-favicon">
+                    <span class="result-url">${promo.display_url || domain}</span>
+                </div>
+                <h3 class="result-title">
+                    <a href="${promo.url}" target="_blank" rel="sponsored noopener noreferrer">
+                        ${promo.title}
+                    </a>
+                </h3>
+                <p class="result-snippet">${promo.content}</p>
+                <div class="promoted-footer">
+                    <span class="promoted-contact">
+                        💼 Promote your site: <a href="mailto:a.tormen2012@gmail.com">Contact us</a>
+                    </span>
+                    <span class="promoted-bid">💰 Bid: $${promo.bid_amount || 'N/A'}</span>
+                </div>
+            </div>
+        `;
+    });
+    
+    promotedSection.innerHTML = promotedHTML;
+    container.appendChild(promotedSection);
+}
+
+// Display organic results with logos
+function displayOrganicResults(results, container, page) {
+    const startRank = ((page - 1) * RESULTS_PER_PAGE) + 1;
+    
+    results.forEach((result, index) => {
+        const rank = startRank + index;
+        const resultElement = createResultElement(result, rank);
+        container.appendChild(resultElement);
     });
 }
 
-// Create a result element
+// Create individual result element with logo
 function createResultElement(result, rank) {
     const div = document.createElement('div');
-    div.className = 'search-result';
+    div.className = 'result-item organic-item';
+    
+    const domain = extractDomain(result.url);
+    const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+    
     div.innerHTML = `
+        <div class="result-rank">#${rank}</div>
         <div class="result-header">
-            <span class="result-rank">#${rank}</span>
-            <span class="result-domain">${extractDomain(result.url)}</span>
+            <img src="${faviconUrl}" alt="${domain} logo" 
+                 class="result-logo" onerror="this.src='assets/default-favicon.svg'">
+            <div class="result-url-info">
+                <span class="result-domain">${domain}</span>
+                <span class="result-engine">${result.engine || 'Web'}</span>
+            </div>
         </div>
         <h3 class="result-title">
             <a href="${result.url}" target="_blank" rel="noopener noreferrer">
-                ${result.title}
+                ${result.title || 'No title'}
             </a>
         </h3>
-        <p class="result-snippet">${result.content}</p>
-        <div class="result-footer">
-            ${result.engine ? `<span class="result-source">via ${result.engine}</span>` : ''}
-            <a href="${result.url}" target="_blank" class="visit-link">Visit →</a>
+        <p class="result-snippet">${result.content || result.snippet || 'No description available'}</p>
+        <div class="result-meta">
+            <span class="result-date">${formatRelativeTime(result.publishedDate)}</span>
+            <a href="${result.url}" class="result-cache" target="_blank">Cached</a>
         </div>
     `;
     
     return div;
 }
 
-// Extract domain from URL
-function extractDomain(url) {
-    try {
-        const urlObj = new URL(url);
-        return urlObj.hostname.replace('www.', '');
-    } catch (e) {
-        return 'website';
-    }
-}
-
-// Show fallback notice
-function showFallbackNotice() {
-    const notice = document.createElement('div');
-    notice.className = 'fallback-notice';
-    notice.innerHTML = `
-        <p>⚠️ Showing enhanced results while optimizing search performance.</p>
-    `;
+// Professional pagination like Google/Bing
+function showProfessionalPagination(currentPage, totalPages, query) {
+    const pagination = document.getElementById('pagination');
+    if (!pagination || totalPages <= 1) return;
     
-    const container = document.getElementById('resultsContainer');
-    if (container.firstChild) {
-        container.insertBefore(notice, container.firstChild);
+    let html = '';
+    const maxVisiblePages = 10;
+    
+    // Previous button
+    if (currentPage > 1) {
+        html += `<a href="?q=${encodeURIComponent(query)}&page=${currentPage - 1}" 
+                     class="page-btn page-prev">‹ Previous</a>`;
     }
+    
+    // First page
+    if (currentPage > 3) {
+        html += `<a href="?q=${encodeURIComponent(query)}&page=1" class="page-btn">1</a>`;
+        if (currentPage > 4) html += `<span class="page-dots">...</span>`;
+    }
+    
+    // Page numbers around current page
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, currentPage + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        if (i === currentPage) {
+            html += `<span class="page-btn page-active">${i}</span>`;
+        } else {
+            html += `<a href="?q=${encodeURIComponent(query)}&page=${i}" class="page-btn">${i}</a>`;
+        }
+    }
+    
+    // Last page
+    if (currentPage < totalPages - 2) {
+        if (currentPage < totalPages - 3) html += `<span class="page-dots">...</span>`;
+        html += `<a href="?q=${encodeURIComponent(query)}&page=${totalPages}" 
+                    class="page-btn">${totalPages}</a>`;
+    }
+    
+    // Next button
+    if (currentPage < totalPages) {
+        html += `<a href="?q=${encodeURIComponent(query)}&page=${currentPage + 1}" 
+                     class="page-btn page-next">Next ›</a>`;
+    }
+    
+    // Page selector dropdown
+    if (totalPages > 5) {
+        html += `
+            <div class="page-selector">
+                <span>Go to page:</span>
+                <select onchange="goToPage(this.value, '${encodeURIComponent(query)}')">
+                    ${Array.from({length: Math.min(totalPages, 50)}, (_, i) => i + 1)
+                        .map(p => `<option value="${p}" ${p === currentPage ? 'selected' : ''}>${p}</option>`)
+                        .join('')}
+                </select>
+            </div>
+        `;
+    }
+    
+    pagination.innerHTML = html;
 }
 
-// Show no results
-function showNoResults(query) {
-    const resultsContainer = document.getElementById('resultsContainer');
-    resultsContainer.innerHTML = `
-        <div class="no-results">
-            <h3>No results found for "${query}"</h3>
-            <p>Try these suggestions:</p>
-            <ul class="suggestions">
-                <li><a href="?q=${encodeURIComponent(query.split(' ')[0])}">Search for "${query.split(' ')[0]}"</a></li>
-                <li><a href="?q=${encodeURIComponent(query + ' tutorial')}">Try "${query} tutorial"</a></li>
-                <li><a href="?q=${encodeURIComponent('what is ' + query)}">Search "what is ${query}"</a></li>
-            </ul>
-            <div class="alternative-engines">
-                <p>Or try searching on:</p>
-                <a href="https://duckduckgo.com/?q=${encodeURIComponent(query)}" target="_blank">DuckDuckGo</a>
-                <a href="https://www.google.com/search?q=${encodeURIComponent(query)}" target="_blank">Google</a>
+// Page navigation function
+function goToPage(page, query) {
+    window.location.href = `?q=${query}&page=${page}`;
+}
+
+// Update URL without reload
+function updateURL(query, page) {
+    const newURL = `${window.location.pathname}?q=${encodeURIComponent(query)}&page=${page}`;
+    window.history.pushState({ query, page }, '', newURL);
+}
+
+// Show loading animation
+function showLoadingAnimation(query, page, container) {
+    container.innerHTML = `
+        <div class="loading-container">
+            <div class="loading-logo">🔍</div>
+            <div class="loading-text">
+                <h3>Searching for "${query}"</h3>
+                <p>Page ${page} • Fetching private, non-tracked results...</p>
+            </div>
+            <div class="loading-progress">
+                <div class="loading-bar"></div>
+            </div>
+            <div class="loading-stats">
+                <div class="stat">
+                    <div class="stat-value">0</div>
+                    <div class="stat-label">results</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">0.00s</div>
+                    <div class="stat-label">time</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">${page}</div>
+                    <div class="stat-label">page</div>
+                </div>
             </div>
         </div>
     `;
 }
 
-// Setup dark mode
-function setupDarkMode() {
-    const darkModeToggle = document.getElementById('darkModeToggle');
-    if (darkModeToggle) {
-        darkModeToggle.addEventListener('click', (e) => {
-            e.preventDefault();
-            document.body.classList.toggle('dark-mode');
-            localStorage.setItem('ymalDarkMode', document.body.classList.contains('dark-mode'));
-        });
-        
-        // Load saved preference
-        if (localStorage.getItem('ymalDarkMode') === 'true') {
-            document.body.classList.add('dark-mode');
-        }
+// No results message
+function showNoResultsMessage(query) {
+    const container = document.getElementById('resultsContainer');
+    container.innerHTML = `
+        <div class="no-results">
+            <div class="no-results-icon">🔍</div>
+            <h3>No results found for "${query}"</h3>
+            <p>Try adjusting your search or check out these alternatives:</p>
+            <div class="alternative-searches">
+                <a href="?q=${encodeURIComponent(query + ' tutorial')}" class="alt-search">${query} tutorial</a>
+                <a href="?q=${encodeURIComponent(query + ' guide')}" class="alt-search">${query} guide</a>
+                <a href="?q=${encodeURIComponent('how to ' + query)}" class="alt-search">how to ${query}</a>
+            </div>
+        </div>
+    `;
+}
+
+// Add privacy footer
+function addPrivacyFooter(query) {
+    const container = document.getElementById('resultsContainer');
+    const footer = document.createElement('div');
+    footer.className = 'privacy-footer';
+    footer.innerHTML = `
+        <div class="privacy-banner">
+            <span class="privacy-icon">🔒</span>
+            <div class="privacy-text">
+                <strong>Private Search Guaranteed</strong>
+                <p>Your search for "${query}" was not tracked, logged, or stored.</p>
+                <a href="https://ymal.space/privacy-policy.html">Read our privacy policy →</a>
+            </div>
+        </div>
+    `;
+    container.appendChild(footer);
+}
+
+// Utility: Extract domain from URL
+function extractDomain(url) {
+    try {
+        return new URL(url).hostname.replace('www.', '');
+    } catch {
+        return 'unknown-source';
     }
 }
 
-// Add search result styles
-const searchStyles = document.createElement('style');
-searchStyles.textContent = `
-    /* Header Styles */
-    .results-header {
-        background: var(--white);
-        padding: 20px 0;
-        box-shadow: var(--shadow);
-        position: sticky;
-        top: 0;
-        z-index: 100;
-    }
+// Utility: Format relative time
+function formatRelativeTime(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     
-    .results-logo {
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: var(--primary-blue);
-        text-decoration: none;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    return date.toLocaleDateString();
+}
+
+// Setup dark mode
+function setupDarkMode() {
+    const toggle = document.getElementById('darkModeToggle');
+    if (!toggle) return;
     
-    .results-search-form {
-        max-width: 600px;
-        margin: 20px auto;
-    }
+    toggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.body.classList.toggle('dark-mode');
+        localStorage.setItem('ymalDarkMode', document.body.classList.contains('dark-mode'));
+    });
     
-    .results-input-wrapper {
-        display: flex;
-        align-items: center;
-        background: var(--white);
-        border: 2px solid var(--border-color);
-        border-radius: 50px;
-        padding: 5px 5px 5px 20px;
-        transition: border-color 0.3s;
+    if (localStorage.getItem('ymalDarkMode') === 'true') {
+        document.body.classList.add('dark-mode');
     }
+}
+
+// Setup search suggestions
+function setupSearchSuggestions() {
+    const input = document.getElementById('searchInput');
+    if (!input) return;
     
-    .results-input-wrapper:focus-within {
-        border-color: var(--primary-blue);
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-    }
+    // Add instant search on typing
+    input.addEventListener('input', debounce(function(e) {
+        const query = this.value.trim();
+        if (query.length > 2) {
+            // Could fetch suggestions here
+            console.log('Suggestion for:', query);
+        }
+    }, 300));
+}
+
+// Setup quick search tips
+function setupQuickSearch() {
+    const tips = document.querySelectorAll('.tip');
+    tips.forEach(tip => {
+        tip.addEventListener('click', function() {
+            const query = this.textContent.replace('!', '');
+            document.getElementById('searchInput').value = query;
+            document.getElementById('searchForm').submit();
+        });
+    });
+}
+
+// Debounce utility
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Generate mock results for fallback
+function generateMockResults(query, page = 1) {
+    const mockData = [
+        {
+            title: `Wikipedia: ${query}`,
+            content: `Learn about ${query} on Wikipedia, the free encyclopedia. Find comprehensive information and references.`,
+            url: `https://en.wikipedia.org/wiki/${encodeURIComponent(query)}`,
+            engine: 'Wikipedia'
+        },
+        {
+            title: `${query} Tutorial - YouTube`,
+            content: `Watch step-by-step tutorials about ${query}. Learn from experts with practical examples and demonstrations.`,
+            url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}+tutorial`,
+            engine: 'YouTube'
+        },
+        {
+            title: `${query} on Reddit`,
+            content: `Join the discussion about ${query} on Reddit. See what the community is saying and share your thoughts.`,
+            url: `https://www.reddit.com/search?q=${encodeURIComponent(query)}`,
+            engine: 'Reddit'
+        },
+        {
+            title: `GitHub Projects: ${query}`,
+            content: `Find open-source projects related to ${query} on GitHub. Browse code repositories and contribute.`,
+            url: `https://github.com/search?q=${encodeURIComponent(query)}`,
+            engine: 'GitHub'
+        },
+        {
+            title: `${query} Documentation`,
+            content: `Official documentation and API references for ${query}. Find detailed guides and examples.`,
+            url: `https://devdocs.io/?q=${encodeURIComponent(query)}`,
+            engine: 'DevDocs'
+        }
+    ];
     
-    .search-icon {
-        font-size: 1.2rem;
-        color: var(--text-light);
-        margin-right: 10px;
-    }
+    // Simulate pagination
+    const start = (page - 1) * RESULTS_PER_PAGE;
+    const paginatedResults = mockData.slice(start, start + RESULTS_PER_PAGE);
     
-    #searchInput {
-        flex: 1;
-        border: none;
-        outline: none;
-        font-size: 1rem;
-        padding: 10px;
-        background: transparent;
-        color: var(--text-dark);
+    return {
+        results: paginatedResults,
+        number_of_results: mockData.length * 3, // Simulate more results
+        query_time: 0.45
+    };
+}
+
+// Initialize pagination for back/forward buttons
+window.addEventListener('popstate', function(event) {
+    if (event.state && event.state.query) {
+        currentQuery = event.state.query;
+        currentPage = event.state.page || 1;
+        performSearch(currentQuery, currentPage);
     }
-    
-    .search-button {
-        background: linear-gradient(135deg, var(--primary-blue), var(--primary-red));
-        color: white;
-        border: none;
-        padding: 12px 30px;
-        border-radius: 50px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: transform 0.2s, opacity 0.2s;
-    }
-    
-    .search-button:hover {
-        transform: translateY(-2px);
-        opacity: 0.9;
-    }
-    
-    .back-link {
-        color: var(--text-light);
-        text-decoration: none;
-        display: inline-block;
-        margin-top: 10px;
-    }
-    
-    /* Results Styles */
-    .results-info {
-        color: var(--text-light);
-        margin: 30px 0;
-        padding-bottom: 15px;
-        border-bottom: 1px solid var(--border-color);
-    }
-    
-    .search-result {
-        background: var(--white);
-        border-radius: 12px;
-        padding: 25px;
-        margin-bottom: 20px;
-        box-shadow: var(--shadow);
-        border-left: 4px solid var(--primary-blue);
-        transition: transform 0.3s;
-    }
-    
-    .search-result:hover {
-        transform: translateY(-3px);
-    }
-    
-    .result-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 10px;
-    }
-    
-    .result-rank {
-        background: var(--light-blue);
-        color: var(--primary-blue);
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 0.9rem;
-    }
-    
-    .result-domain {
-        color: #0d9488;
-        font-size: 0.85rem;
-        font-weight: 500;
-    }
-    
-    .result-title {
-        margin: 0 0 12px 0;
-        font-size: 1.3rem;
-    }
-    
-    .result-title a {
-        color: var(--primary-blue);
-        text-decoration: none;
-        transition: color 0.2s;
-    }
-    
-    .result-title a:hover {
-        color: var(--dark-blue);
-        text-decoration: underline;
-    }
-    
-    .result-snippet {
-        color: var(--text-light);
-        line-height: 1.6;
-        margin-bottom: 15px;
-    }
-    
-    .result-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding-top: 15px;
-        border-top: 1px solid var(--border-color);
-    }
-    
-    .result-source {
-        background: var(--light-blue);
-        color: var(--primary-blue);
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.85rem;
-    }
-    
-    .visit-link {
-        color: var(--primary-blue);
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 0.9rem;
-        transition: all 0.2s;
-    }
-    
-    .visit-link:hover {
-        color: var(--dark-blue);
-        transform: translateX(5px);
-    }
-    
-    /* Footer Styles */
-    .search-footer {
-        margin-top: 50px;
-        padding: 30px 0;
-        border-top: 1px solid var(--border-color);
-        color: var(--text-light);
-    }
-    
-    .footer-links {
-        display: flex;
-        justify-content: center;
-        gap: 30px;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-    }
-    
-    .footer-links a {
-        color: var(--text-light);
-        text-decoration: none;
-        transition: color 0.2s;
-    }
-    
-    .footer-links a:hover {
-        color: var(--primary-blue);
-    }
-    
-    .footer-note {
-        text-align: center;
-        font-size: 0.9rem;
-    }
-    
-    /* Fallback Notice */
-    .fallback-notice {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        color: white;
-        padding: 15px 20px;
-        border-radius: 10px;
-        margin-bottom: 25px;
-        text-align: center;
-        animation: fadeIn 0.5s ease-out;
-    }
-    
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-    
-    /* No Results */
-    .no-results {
-        text-align: center;
-        padding: 40px 20px;
-        max-width: 600px;
-        margin: 0 auto;
-    }
-    
-    .suggestions {
-        list-style: none;
-        padding: 0;
-        margin: 20px 0;
-    }
-    
-    .suggestions li {
-        margin: 10px 0;
-    }
-    
-    .suggestions a {
-        color: var(--primary-blue);
-        text-decoration: none;
-        font-weight: 500;
-    }
-    
-    .suggestions a:hover {
-        text-decoration: underline;
-    }
-    
-    .alternative-engines {
-        margin-top: 30px;
-    }
-    
-    .alternative-engines a {
-        display: inline-block;
-        margin: 10px;
-        padding: 10px 20px;
-        background: var(--white);
-        color: var(--text-dark);
-        text-decoration: none;
-        border-radius: 8px;
-        border: 2px solid var(--border-color);
-        transition: all 0.2s;
-    }
-    
-    .alternative-engines a:hover {
-        border-color: var(--primary-blue);
-        transform: translateY(-2px);
-    }
-    
-    /* Privacy Note */
-    .privacy-note {
-        background: var(--light-blue);
-        padding: 20px;
-        border-radius: 10px;
-        text-align: center;
-        margin-top: 40px;
-    }
-`;
-document.head.appendChild(searchStyles);
+});
