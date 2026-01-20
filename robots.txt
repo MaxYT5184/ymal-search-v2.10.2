@@ -1,0 +1,15 @@
+# Allow all search engines to crawl your main site
+User-agent: *
+Allow: /
+
+# Disallow unnecessary folders/files that don't need indexing
+Disallow: /school/history/
+Disallow: /school/admin/
+Disallow: /node_modules/
+Disallow: /scripts/
+Disallow: /test/
+Disallow: /private/
+Disallow: /config/
+
+# Sitemap location (if you have one)
+Sitemap: https://ymal.space/sitemap.xml
